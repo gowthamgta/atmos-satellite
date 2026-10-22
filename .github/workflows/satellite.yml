@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: satellite
+  group: satellite-v2   # renamed so new runs do not wait behind an old run whose deployment job got stuck in GitHub's queue (22 Oct)
   cancel-in-progress: false
 
 permissions:
