@@ -54,13 +54,13 @@ jobs:
       - name: What is live
         working-directory: atmos/pipeline
         run: python satellite_restore.py --base "https://gowthamgta.github.io/atmos-satellite/" --out "$GITHUB_WORKSPACE/site"
-      - name: Brightness temperatures (Meteosat)
+      - name: Brightness temperatures and our own pictures (Meteosat)
         continue-on-error: true      # Himawari is still published when the Data Store refuses
         working-directory: atmos/pipeline
         env:
           EUMETSAT_CONSUMER_KEY: ${{ secrets.EUMETSAT_CONSUMER_KEY }}
           EUMETSAT_CONSUMER_SECRET: ${{ secrets.EUMETSAT_CONSUMER_SECRET }}
-        run: python satellite_bt.py --out "$GITHUB_WORKSPACE/site"
+        run: python satellite_bt.py --out "$GITHUB_WORKSPACE/site" --pictures
       - name: Brightness temperatures (Himawari-9)
         continue-on-error: true
         working-directory: atmos/pipeline
