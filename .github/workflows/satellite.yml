@@ -24,11 +24,13 @@ permissions:
   id-token: write
 
 jobs:
-  build:
+  # one job (one machine) does it all: a separate deployment job had to wait for a machine of its own, and while GitHub Actions was slow
+  # it sat queued and held up every run behind it
+  publish:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    outputs:
-      publish: ${{ steps.check.outputs.publish }}
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,7 +74,7 @@ jobs:
         run: |
           if ls site/*/index.json >/dev/null 2>&1; then
             touch site/.nojekyll
-            echo '<!doctype html><title>atmos-satellite</title><p>Data for <a href="https://github.com/gowthamgta/Atmos">AtmosIQ</a>: bt-h9/index.json (Himawari-9), bt/index.json (Meteosat).' > site/index.html
+            echo '<!doctype html><title>atmos-satellite</title><p>Data for <a href="https://github.com/gowthamgta/Atmos">AtmosIQ</a>: bt-h9/index.json (Himawari-9 temperatures), rgb-h9/index.json (our own pictures), bt/index.json (Meteosat).' > site/index.html
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::nothing to publish"
@@ -82,12 +84,5 @@ jobs:
         with:
           path: site
           retention-days: 1
-
-  deploy:
-    needs: build
-    if: needs.build.outputs.publish == 'true'
-    runs-on: ubuntu-24.04
-    environment:
-      name: github-pages
-    steps:
       - uses: actions/deploy-pages@v5
+        if: steps.check.outputs.publish == 'true'
