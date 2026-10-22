@@ -1,0 +1,83 @@
+name: satellite
+
+# Measured cloud-top temperatures over India for AtmosIQ's 3D clouds (https://github.com/gowthamgta/Atmos): Himawari-9 from NOAA's open copy
+# on AWS (bt-h9/, no key) and Meteosat from the EUMETSAT Data Store (bt/, needs the secrets EUMETSAT_CONSUMER_KEY and EUMETSAT_CONSUMER_SECRET),
+# the last hour of each, published with GitHub Pages at https://gowthamgta.github.io/atmos-satellite/. A Pages deployment keeps nothing in
+# git, so this repository does not grow; each run fetches back what is live, adds the newest frames and deploys the whole folder again.
+# The code is Atmos's pipeline (satellite_restore.py, satellite_bt.py, himawari_bt.py), checked out at each run.
+#
+# Started every 10 minutes by cron-job.org through the API (workflow_dispatch); the schedule below is only a fallback (GitHub's own
+# schedule runs late or not at all when it is busy).
+on:
+  schedule:
+    - cron: "4,19,34,49 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: satellite
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    outputs:
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: gowthamgta/Atmos
+          path: atmos
+          sparse-checkout: pipeline
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: atmos/pipeline/requirements-satellite.txt
+      - run: pip install -r atmos/pipeline/requirements-satellite.txt
+      - name: Tests
+        working-directory: atmos/pipeline
+        run: python -m pytest -q tests/test_satellite_bt.py tests/test_himawari_bt.py tests/test_satellite_restore.py
+      - name: What is live
+        working-directory: atmos/pipeline
+        run: python satellite_restore.py --base "https://gowthamgta.github.io/atmos-satellite/" --out "$GITHUB_WORKSPACE/site"
+      - name: Brightness temperatures (Meteosat)
+        continue-on-error: true      # Himawari is still published when the Data Store refuses
+        working-directory: atmos/pipeline
+        env:
+          EUMETSAT_CONSUMER_KEY: ${{ secrets.EUMETSAT_CONSUMER_KEY }}
+          EUMETSAT_CONSUMER_SECRET: ${{ secrets.EUMETSAT_CONSUMER_SECRET }}
+        run: python satellite_bt.py --out "$GITHUB_WORKSPACE/site"
+      - name: Brightness temperatures (Himawari-9)
+        continue-on-error: true
+        working-directory: atmos/pipeline
+        run: python himawari_bt.py --out "$GITHUB_WORKSPACE/site"
+      - name: Anything to publish
+        id: check
+        run: |
+          if ls site/*/index.json >/dev/null 2>&1; then
+            touch site/.nojekyll
+            echo '<!doctype html><title>atmos-satellite</title><p>Data for <a href="https://github.com/gowthamgta/Atmos">AtmosIQ</a>: bt-h9/index.json (Himawari-9), bt/index.json (Meteosat).' > site/index.html
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::nothing to publish"
+          fi
+      - uses: actions/upload-pages-artifact@v5
+        if: steps.check.outputs.publish == 'true'
+        with:
+          path: site
+          retention-days: 1
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v5
