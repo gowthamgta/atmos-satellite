@@ -2,6 +2,7 @@ name: satellite
 
 # Measured cloud-top temperatures over India for AtmosIQ's 3D clouds (https://github.com/gowthamgta/Atmos): Himawari-9 from NOAA's open copy
 # on AWS (bt-h9/, no key) and Meteosat from the EUMETSAT Data Store (bt/, needs the secrets EUMETSAT_CONSUMER_KEY and EUMETSAT_CONSUMER_SECRET),
+# and our own pictures from Himawari's raw bands (rgb-h9/: true colour, sandwich, convection, night microphysics, a data pack),
 # the last hour of each, published with GitHub Pages at https://gowthamgta.github.io/atmos-satellite/. A Pages deployment keeps nothing in
 # git, so this repository does not grow; each run fetches back what is live, adds the newest frames and deploys the whole folder again.
 # The code is Atmos's pipeline (satellite_restore.py, satellite_bt.py, himawari_bt.py), checked out at each run.
@@ -25,7 +26,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 14
+    timeout-minutes: 20
     outputs:
       publish: ${{ steps.check.outputs.publish }}
     steps:
@@ -42,7 +43,12 @@ jobs:
       - run: pip install -r atmos/pipeline/requirements-satellite.txt
       - name: Tests
         working-directory: atmos/pipeline
-        run: python -m pytest -q tests/test_satellite_bt.py tests/test_himawari_bt.py tests/test_satellite_restore.py
+        run: python -m pytest -q tests/test_satellite_bt.py tests/test_himawari_bt.py tests/test_satellite_restore.py tests/test_himawari_rgb.py
+      # pyspectral's Rayleigh tables for true colour (downloaded once, then kept)
+      - uses: actions/cache@v6
+        with:
+          path: ~/.local/share/pyspectral
+          key: pyspectral-v1
       - name: What is live
         working-directory: atmos/pipeline
         run: python satellite_restore.py --base "https://gowthamgta.github.io/atmos-satellite/" --out "$GITHUB_WORKSPACE/site"
@@ -57,6 +63,10 @@ jobs:
         continue-on-error: true
         working-directory: atmos/pipeline
         run: python himawari_bt.py --out "$GITHUB_WORKSPACE/site"
+      - name: Our own pictures (Himawari-9 true colour, sandwich, convection, night microphysics, data pack)
+        continue-on-error: true
+        working-directory: atmos/pipeline
+        run: python himawari_rgb.py --out "$GITHUB_WORKSPACE/site"
       - name: Anything to publish
         id: check
         run: |
