@@ -7,11 +7,9 @@ name: satellite
 # git, so this repository does not grow; each run fetches back what is live, adds the newest frames and deploys the whole folder again.
 # The code is Atmos's pipeline (satellite_restore.py, satellite_bt.py, himawari_bt.py), checked out at each run.
 #
-# Started every 10 minutes by cron-job.org through the API (workflow_dispatch); the schedule below is only a fallback (GitHub's own
-# schedule runs late or not at all when it is busy).
+# Started every 10 minutes by cron-job.org through the API (workflow_dispatch) only; GitHub's own schedule is not used (it ran late
+# or not at all when GitHub was busy).
 on:
-  schedule:
-    - cron: "4,19,34,49 * * * *"
   workflow_dispatch:
 
 concurrency:
