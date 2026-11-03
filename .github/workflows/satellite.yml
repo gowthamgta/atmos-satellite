@@ -43,7 +43,7 @@ jobs:
       - run: pip install -r atmos/pipeline/requirements-satellite.txt
       - name: Tests
         working-directory: atmos/pipeline
-        run: python -m pytest -q tests/test_satellite_bt.py tests/test_himawari_bt.py tests/test_satellite_restore.py tests/test_himawari_rgb.py
+        run: python -m pytest -q tests/test_satellite_bt.py tests/test_himawari_bt.py tests/test_satellite_restore.py tests/test_himawari_rgb.py tests/test_merge_rgb.py
       # pyspectral's Rayleigh tables for true colour (downloaded once, then kept)
       - uses: actions/cache@v6
         with:
@@ -67,12 +67,16 @@ jobs:
         continue-on-error: true
         working-directory: atmos/pipeline
         run: python himawari_rgb.py --out "$GITHUB_WORKSPACE/site"
+      - name: Merged RGB (Meteosat-9 with Himawari-9, by view angle; Meteosat's data pack)
+        continue-on-error: true
+        working-directory: atmos/pipeline
+        run: python merge_rgb.py --out "$GITHUB_WORKSPACE/site"
       - name: Anything to publish
         id: check
         run: |
           if ls site/*/index.json >/dev/null 2>&1; then
             touch site/.nojekyll
-            echo '<!doctype html><title>atmos-satellite</title><p>Data for <a href="https://github.com/gowthamgta/Atmos">AtmosIQ</a>: bt-h9/index.json (Himawari-9 temperatures), rgb-h9/index.json (our own pictures), bt/index.json (Meteosat).' > site/index.html
+            echo '<!doctype html><title>atmos-satellite</title><p>Data for <a href="https://github.com/gowthamgta/Atmos">AtmosIQ</a>: bt-h9/index.json (Himawari-9 temperatures), rgb-h9/index.json (our own pictures), rgb-msg/index.json, rgb-merged/index.json (Meteosat with Himawari), bt/index.json (Meteosat).' > site/index.html
             echo "publish=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::nothing to publish"
